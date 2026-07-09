@@ -422,45 +422,35 @@ const CONFIG = {
   ownerEmail: "info@fingerprintacoustic.com",
   studioName: "Fingerprint Acoustic",
   tiers: {
-    simple:   { label: "Simple utility",            price:[800,1500],   weeks:[1,2]  },
-    standard: { label: "Standard app",               price:[2000,4500],  weeks:[3,5]  },
-    complex:  { label: "Complex / multi-role app",   price:[5000,12000], weeks:[6,10] },
-    platform: { label: "Full platform / marketplace",price:[12000,25000],weeks:[10,16]}
+    simple:   { label: "Simple utility",             price:[800,1500],    weeks:[1,2]  },
+    standard: { label: "Standard app",                price:[2000,4500],   weeks:[3,5]  },
+    complex:  { label: "Complex / multi-role app",    price:[5000,12000],  weeks:[6,10] },
+    platform: { label: "Full platform / marketplace", price:[12000,25000], weeks:[10,16]}
   }
 };
 
-const SYSTEM_PROMPT = `You are the intake desk for ${CONFIG.studioName}, a software studio that builds Android apps (Kotlin/Jetpack Compose), web apps, and full-stack products (Firebase/Firestore, Node.js/Express, static hosting). A prospective client is describing something they want built.
-
-Your job each turn:
-1. If their idea is vague, unclear, or they explicitly ask what they could build, propose 2-3 concrete, specific app concepts suited to their goal or industry, then ask which direction fits before narrowing further.
-2. Otherwise ask ONE focused clarifying question at a time to fill gaps in: platform (Android / iOS / web / cross-platform), core features, whether it needs a backend/database, user accounts, payments, multiple user roles (e.g. admin + customer), and any third-party integrations (maps, SMS, notifications, etc).
-3. Never ask more than 5-6 questions total across the whole conversation. Once you have a workable picture, stop asking and set "done": true with a short closing message summarizing what you understood.
-4. Keep messages short — 2-4 sentences, plain language, no jargon, conversational but efficient. No markdown formatting in "reply".
-
-Respond with ONLY raw JSON, no markdown fences, no commentary outside the JSON:
-{
-  "reply": "your message to the client",
-  "done": boolean,
-  "confidence": integer 0-100 (how clear the full picture is),
-  "specSheet": {
-    "platform": string or null,
-    "appType": string or null,
-    "coreFeatures": [array of short strings],
-    "needsBackend": boolean or null,
-    "needsAuth": boolean or null,
-    "needsPayments": boolean or null,
-    "multiRole": boolean or null,
-    "integrations": [array of short strings]
-  },
-  "complexityTier": "simple" | "standard" | "complex" | "platform" | null,
-  "suggestions": [array of 0-3 short reply chips the client might tap instead of typing, only when useful — e.g. quick answers to your question]
-}`;
-
-let history = [];
-let latestSpec = null;
-let latestTier = null;
-let isDone = false;
-let turns = 0;
+// Canned suggestions for people who don't yet know what they want
+const GOAL_SUGGESTIONS = {
+  "Food & delivery": [
+    "Order & delivery app — browse a menu or catalog, place orders, track delivery status.",
+    "Reservation & pickup app — book a table or a pickup slot, get notified when it's ready."
+  ],
+  "Services & bookings": [
+    "Booking app — pick a service and time slot, get reminders, pay online.",
+    "On-demand service app — request a service, match with a provider, track progress."
+  ],
+  "Retail & inventory": [
+    "Storefront app — browse products, checkout, track orders.",
+    "Inventory & staff app — manage stock, sales, and multiple locations."
+  ],
+  "Community & events": [
+    "Events app — list upcoming events, RSVP, sell tickets.",
+    "Community hub app — members post updates, join groups, message each other."
+  ],
+  "Something else": [
+    "Tell me a bit about the problem you're trying to solve below and we'll shape it together as we go."
+  ]
+};
 
 const chatBody = document.getElementById('chatBody');
 const userInput = document.getElementById('userInput');
@@ -483,7 +473,6 @@ for (let i=0;i<BAR_COUNT;i++){
   b.className = 'bar';
   meter.appendChild(b);
 }
-
 function renderMeter(confidence){
   const lit = Math.round((confidence/100) * BAR_COUNT);
   const bars = meter.querySelectorAll('.bar');
@@ -549,7 +538,14 @@ function renderSpec(spec){
   });
 }
 
-renderSpec(null);
+const spec = {
+  platform: null, appType: null, coreFeatures: [],
+  needsBackend: null, needsAuth: null, needsPayments: null,
+  multiRole: null, integrations: []
+};
+let latestTier = null;
+let turns = 0;
+renderSpec(spec);
 renderMeter(0);
 
 function addMessage(role, text){
@@ -564,34 +560,12 @@ function addMessage(role, text){
   chatBody.scrollTop = chatBody.scrollHeight;
 }
 
-function showTyping(){
-  const div = document.createElement('div');
-  div.className = 'typing';
-  div.id = 'typingIndicator';
-  div.innerHTML = '<span></span><span></span><span></span>';
-  chatBody.appendChild(div);
-  chatBody.scrollTop = chatBody.scrollHeight;
-}
-function hideTyping(){
-  const el = document.getElementById('typingIndicator');
-  if (el) el.remove();
+function bumpTurn(){
+  turns++;
+  turnCount.textContent = turns + (turns === 1 ? ' exchange' : ' exchanges');
 }
 
-function setSuggestions(list){
-  suggestionRow.innerHTML = '';
-  if (!list || !list.length) return;
-  list.forEach(s => {
-    const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.textContent = s;
-    chip.onclick = () => { userInput.value = s; sendMessage(); };
-    suggestionRow.appendChild(chip);
-  });
-}
-
-function showError(msg){
-  errorSlot.innerHTML = '<p class="error-msg">' + msg + '</p>';
-}
+function showError(msg){ errorSlot.innerHTML = '<p class="error-msg">' + msg + '</p>'; }
 function clearError(){ errorSlot.innerHTML = ''; }
 
 function priceRange(tierKey){
@@ -604,8 +578,7 @@ function weeksRange(tierKey){
   if (!t) return '—';
   return t.weeks[0] + '–' + t.weeks[1] + ' wks';
 }
-
-function renderQuote(tierKey, spec){
+function renderQuote(tierKey){
   if (!tierKey || !CONFIG.tiers[tierKey]) return;
   const t = CONFIG.tiers[tierKey];
   document.getElementById('qcTier').textContent = t.label;
@@ -615,85 +588,255 @@ function renderQuote(tierKey, spec){
   jobStatus.textContent = 'QUOTED';
 }
 
-async function callClaude(){
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: SYSTEM_PROMPT,
-      messages: history
-    })
-  });
-  if (!res.ok) throw new Error('Request failed (' + res.status + ')');
-  const data = await res.json();
-  const textBlock = (data.content || []).find(b => b.type === 'text');
-  if (!textBlock) throw new Error('No response received');
-  let raw = textBlock.text.trim();
-  raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/,'').replace(/```\s*$/,'');
-  return JSON.parse(raw);
+// ---- Confidence: how much of the picture we have ----
+function computeConfidence(){
+  const fields = [spec.platform, spec.appType, spec.needsAuth, spec.needsBackend,
+    spec.needsPayments, spec.multiRole];
+  const knownCount = fields.filter(v => v !== null && v !== '').length;
+  const featureBonus = spec.coreFeatures.length ? 15 : 0;
+  const integrationBonus = spec.integrations.length ? 5 : 0;
+  return Math.min(100, Math.round((knownCount / fields.length) * 80) + featureBonus + integrationBonus);
 }
 
-async function sendMessage(){
+// ---- Complexity scoring -> tier ----
+function computeTier(){
+  let score = 0;
+  if (spec.needsBackend) score += 2;
+  if (spec.needsAuth) score += 1;
+  if (spec.needsPayments) score += 2;
+  if (spec.multiRole) score += 3;
+  score += Math.min(3, spec.integrations.length);
+  score += Math.min(3, Math.max(0, spec.coreFeatures.length - 2));
+
+  if (score <= 2) return 'simple';
+  if (score <= 6) return 'standard';
+  if (score <= 10) return 'complex';
+  return 'platform';
+}
+
+// ---- Chip rendering helpers ----
+function setSingleChips(options, onPick){
+  suggestionRow.innerHTML = '';
+  options.forEach(opt => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = opt;
+    chip.onclick = () => {
+      addMessage('user', opt);
+      bumpTurn();
+      suggestionRow.innerHTML = '';
+      onPick(opt);
+    };
+    suggestionRow.appendChild(chip);
+  });
+}
+
+function setMultiChips(options, onContinue){
+  suggestionRow.innerHTML = '';
+  const selected = new Set();
+  options.forEach(opt => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = opt;
+    chip.onclick = () => {
+      if (selected.has(opt)){ selected.delete(opt); chip.style.borderColor=''; chip.style.color=''; }
+      else { selected.add(opt); chip.style.borderColor='var(--signal)'; chip.style.color='var(--signal)'; }
+    };
+    suggestionRow.appendChild(chip);
+  });
+  const doneChip = document.createElement('button');
+  doneChip.className = 'chip';
+  doneChip.style.borderColor = 'var(--amber)';
+  doneChip.textContent = 'Continue →';
+  doneChip.onclick = () => {
+    const picked = Array.from(selected);
+    addMessage('user', picked.length ? picked.join(', ') : 'None of these');
+    bumpTurn();
+    suggestionRow.innerHTML = '';
+    onContinue(picked);
+  };
+  suggestionRow.appendChild(doneChip);
+}
+
+function enableTextInput(placeholder, onSubmit){
+  userInput.disabled = false;
+  sendBtn.disabled = false;
+  userInput.placeholder = placeholder;
+  userInput.focus();
+  pendingTextHandler = onSubmit;
+}
+function disableTextInput(){
+  userInput.disabled = true;
+  sendBtn.disabled = true;
+  pendingTextHandler = null;
+}
+let pendingTextHandler = null;
+
+function sendMessage(){
   const text = userInput.value.trim();
-  if (!text || isDone) return;
+  if (!text || !pendingTextHandler) return;
   clearError();
-  setSuggestions([]);
   addMessage('user', text);
-  history.push({ role: 'user', content: text });
+  bumpTurn();
   userInput.value = '';
   autoGrow();
-  sendBtn.disabled = true;
-  userInput.disabled = true;
-  showTyping();
-
-  try{
-    const parsed = await callClaude();
-    hideTyping();
-    turns++;
-    turnCount.textContent = turns + (turns === 1 ? ' exchange' : ' exchanges');
-
-    addMessage('assistant', parsed.reply || "Got it.");
-    history.push({ role: 'assistant', content: JSON.stringify(parsed) });
-
-    if (typeof parsed.confidence === 'number') renderMeter(parsed.confidence);
-    if (parsed.specSheet){ latestSpec = parsed.specSheet; renderSpec(parsed.specSheet); }
-    if (parsed.complexityTier){ latestTier = parsed.complexityTier; }
-    if (parsed.suggestions) setSuggestions(parsed.suggestions);
-
-    if (parsed.done){
-      isDone = true;
-      userInput.placeholder = "Conversation complete — see your quote →";
-      if (latestTier) renderQuote(latestTier, latestSpec);
-    }
-  } catch(err){
-    hideTyping();
-    showError("Couldn't reach the studio desk — " + err.message + ". Try sending again.");
-  } finally {
-    sendBtn.disabled = false;
-    userInput.disabled = isDone;
-    if (!isDone) userInput.focus();
-  }
+  const handler = pendingTextHandler;
+  disableTextInput();
+  handler(text);
 }
-
 function autoGrow(){
   userInput.style.height = 'auto';
   userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
 }
-
 userInput.addEventListener('input', autoGrow);
 userInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey){
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
 });
 sendBtn.addEventListener('click', sendMessage);
+
+// ---- The flow ----
+function refreshUI(){
+  renderMeter(computeConfidence());
+  renderSpec(spec);
+}
+
+function step_mode(){
+  addMessage('assistant', "Do you already know what kind of app you want, or would a few suggestions help first?");
+  disableTextInput();
+  setSingleChips(["I know what I want", "Suggest some ideas"], (choice) => {
+    if (choice === "Suggest some ideas") step_suggestGoal();
+    else step_platform();
+  });
+}
+
+function step_suggestGoal(){
+  addMessage('assistant', "What's closest to what you're working on?");
+  setSingleChips(Object.keys(GOAL_SUGGESTIONS), (goal) => {
+    const ideas = GOAL_SUGGESTIONS[goal];
+    addMessage('assistant', ideas.join('\n\n'));
+    if (goal === "Something else"){
+      enableTextInput("Describe what you're trying to build...", (text) => {
+        spec.appType = text;
+        refreshUI();
+        step_platform();
+      });
+    } else {
+      addMessage('assistant', "Which of those fits — or describe your own version below.");
+      const chipOptions = ideas.map((_, i) => 'Option ' + (i+1));
+      setSingleChips(chipOptions, (pick) => {
+        const idx = parseInt(pick.replace('Option ',''), 10) - 1;
+        spec.appType = ideas[idx];
+        refreshUI();
+        step_platform();
+      });
+      enableTextInput("...or describe your own version here", (text) => {
+        spec.appType = text;
+        refreshUI();
+        suggestionRow.innerHTML = '';
+        step_platform();
+      });
+    }
+  });
+}
+
+function step_platform(){
+  addMessage('assistant', "Which platform is this for?");
+  disableTextInput();
+  setSingleChips(["Android", "iOS", "Web app", "Android & Web", "Not sure yet"], (choice) => {
+    spec.platform = choice;
+    refreshUI();
+    step_description();
+  });
+}
+
+function step_description(){
+  addMessage('assistant', spec.appType
+    ? "Give me a one-line description of the app in your own words (or press send to keep what we have)."
+    : "In one line, what should this app do?");
+  enableTextInput("e.g. Customers book a laundry pickup slot from their phone...", (text) => {
+    spec.appType = text;
+    refreshUI();
+    step_auth();
+  });
+}
+
+function step_auth(){
+  addMessage('assistant', "Will people need to create an account or log in?");
+  disableTextInput();
+  setSingleChips(["Yes", "No"], (choice) => {
+    spec.needsAuth = (choice === "Yes");
+    refreshUI();
+    step_backend();
+  });
+}
+
+function step_backend(){
+  addMessage('assistant', "Does it need to store data — like orders, listings, or user info — in a database?");
+  disableTextInput();
+  setSingleChips(["Yes", "No", "Not sure"], (choice) => {
+    spec.needsBackend = choice === "Not sure" ? (spec.needsAuth === true) : (choice === "Yes");
+    refreshUI();
+    step_payments();
+  });
+}
+
+function step_payments(){
+  addMessage('assistant', "Will it handle payments?");
+  disableTextInput();
+  setSingleChips(["Yes", "No"], (choice) => {
+    spec.needsPayments = (choice === "Yes");
+    if (spec.needsPayments) spec.needsBackend = true;
+    refreshUI();
+    step_multiRole();
+  });
+}
+
+function step_multiRole(){
+  addMessage('assistant', "Will there be more than one kind of user — like a customer view and an admin or provider view?");
+  disableTextInput();
+  setSingleChips(["Yes", "No"], (choice) => {
+    spec.multiRole = (choice === "Yes");
+    if (spec.multiRole) spec.needsBackend = true;
+    refreshUI();
+    step_integrations();
+  });
+}
+
+function step_integrations(){
+  addMessage('assistant', "Any of these needed? Pick as many as apply, then continue.");
+  disableTextInput();
+  setMultiChips(["Maps / location", "SMS notifications", "Push notifications", "Real-time chat"], (picked) => {
+    spec.integrations = picked;
+    refreshUI();
+    step_features();
+  });
+}
+
+function step_features(){
+  addMessage('assistant', "Last one — which of these core features does it need?");
+  disableTextInput();
+  setMultiChips(["Browse / search", "Booking or scheduling", "Order tracking", "Reviews / ratings", "Messaging", "Photo / file upload"], (picked) => {
+    spec.coreFeatures = picked;
+    refreshUI();
+    step_done();
+  });
+}
+
+function step_done(){
+  latestTier = computeTier();
+  const tierLabel = CONFIG.tiers[latestTier].label;
+  addMessage('assistant', "Got it — that reads as a " + tierLabel.toLowerCase() + ". Here's the estimate on the right. Confirm it when you're ready and I'll get in touch.");
+  disableTextInput();
+  suggestionRow.innerHTML = '';
+  userInput.placeholder = "Conversation complete — see your quote →";
+  renderMeter(100);
+  renderQuote(latestTier);
+}
 
 document.getElementById('confirmBtn').addEventListener('click', () => {
   document.getElementById('confirmedBox').classList.add('show');
   jobStatus.textContent = 'CONFIRMED';
+  refreshMailto();
 });
 
 document.getElementById('copyBtn').addEventListener('click', () => {
@@ -710,7 +853,6 @@ function buildSummary(){
   const name = document.getElementById('contactName').value || '(no name given)';
   const email = document.getElementById('contactEmail').value || '(no email given)';
   const tier = latestTier ? CONFIG.tiers[latestTier].label : 'Unspecified';
-  const spec = latestSpec || {};
   const lines = [
     'New quote confirmation — ' + CONFIG.studioName,
     '',
@@ -739,16 +881,11 @@ function refreshMailto(){
 ['contactName','contactEmail'].forEach(id => {
   document.getElementById(id).addEventListener('input', refreshMailto);
 });
-document.getElementById('confirmBtn').addEventListener('click', refreshMailto);
 
-// opening message
+// kick off
 (function init(){
-  const opener = "Tell me what you're trying to build — a one-liner is fine. If you're not sure yet what kind of app fits, just say that and I'll suggest a few directions.";
-  addMessage('assistant', opener);
-  history.push({ role: 'user', content: '[SYSTEM: conversation starting, no client message yet — send your opening line as the "reply" field of the JSON schema, done=false, confidence=0, specSheet all null/empty]' });
-  history.push({ role: 'assistant', content: JSON.stringify({reply: opener, done:false, confidence:0, specSheet:{platform:null,appType:null,coreFeatures:[],needsBackend:null,needsAuth:null,needsPayments:null,multiRole:null,integrations:[]}, complexityTier:null, suggestions:["I know exactly what I want","Not sure — suggest some ideas"]}) });
-  setSuggestions(["I know exactly what I want","Not sure — suggest some ideas"]);
-  userInput.focus();
+  addMessage('assistant', "Tell me what you're trying to build — I'll ask a few quick questions and hand you a quote.");
+  step_mode();
 })();
 </script>
 </body>
