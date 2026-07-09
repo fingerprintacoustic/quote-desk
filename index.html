@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fingerprint Acoustic — Studio Intake</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --ink:#0E1420;
+  --ink-2:#161F33;
+  --panel:#1A2438;
+  --line:#31405E;
+  --paper:#E8E4D6;
+  --paper-dim:#B9B6A9;
+  --amber:#E3A23C;
+  --amber-dim:#9C7434;
+  --signal:#6FCF97;
+  --signal-dim:#3E6E58;
+  --red:#D9695F;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ink);
+  color:var(--paper);
+  font-family:'IBM Plex Sans',sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--amber);color:var(--ink);}
+
+.wrap{
+  max-width:1180px;
+  margin:0 auto;
+  padding:28px 20px 60px;
+}
+
+/* header */
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:16px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:20px;
+  margin-bottom:28px;
+  flex-wrap:wrap;
+}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--amber);
+  margin:0 0 8px;
+}
+h1{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;
+  font-size:clamp(24px,3.4vw,34px);
+  margin:0;
+  line-height:1.15;
+  letter-spacing:-0.01em;
+}
+.sub{
+  color:var(--paper-dim);
+  font-size:14.5px;
+  margin-top:8px;
+  max-width:52ch;
+}
+.ticket-id{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  color:var(--paper-dim);
+  text-align:right;
+  line-height:1.6;
+}
+.ticket-id b{color:var(--paper);font-weight:600;}
+
+/* layout */
+.grid{
+  display:grid;
+  grid-template-columns:1.3fr 1fr;
+  gap:22px;
+  align-items:start;
+}
+@media (max-width:860px){
+  .grid{grid-template-columns:1fr;}
+}
+
+/* chat panel */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:3px;
+}
+.panel-head{
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--paper-dim);
+  display:flex;
+  justify-content:space-between;
+}
+
+.chat-body{
+  padding:18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-height:340px;
+  max-height:520px;
+  overflow-y:auto;
+}
+.msg{
+  max-width:82%;
+  padding:11px 14px;
+  border-radius:2px;
+  font-size:14.5px;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+.msg.assistant{
+  background:var(--ink-2);
+  border-left:2px solid var(--amber);
+  align-self:flex-start;
+}
+.msg.user{
+  background:#242F49;
+  border-right:2px solid var(--signal);
+  align-self:flex-end;
+  text-align:right;
+}
+.msg .tag{
+  display:block;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--paper-dim);
+  margin-bottom:4px;
+}
+.suggestion-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  padding:0 18px 14px;
+}
+.chip{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11.5px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--paper-dim);
+  padding:6px 10px;
+  border-radius:2px;
+  cursor:pointer;
+}
+.chip:hover{border-color:var(--amber);color:var(--paper);}
+
+.typing{
+  align-self:flex-start;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  color:var(--paper-dim);
+  padding:6px 4px;
+}
+.typing span{
+  display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--amber);margin-right:3px;
+  animation:pulse 1s infinite ease-in-out;
+}
+.typing span:nth-child(2){animation-delay:0.15s;}
+.typing span:nth-child(3){animation-delay:0.3s;}
+@keyframes pulse{0%,80%,100%{opacity:0.25;}40%{opacity:1;}}
+
+.input-row{
+  display:flex;
+  gap:10px;
+  padding:14px 18px;
+  border-top:1px solid var(--line);
+}
+textarea{
+  flex:1;
+  resize:none;
+  background:var(--ink);
+  border:1px solid var(--line);
+  color:var(--paper);
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:14px;
+  padding:10px 12px;
+  border-radius:2px;
+  min-height:44px;
+  max-height:120px;
+}
+textarea:focus{outline:2px solid var(--amber);outline-offset:1px;}
+button{
+  font-family:'IBM Plex Mono',monospace;
+  cursor:pointer;
+}
+.send-btn{
+  background:var(--amber);
+  color:var(--ink);
+  border:none;
+  font-weight:600;
+  font-size:12.5px;
+  letter-spacing:0.05em;
+  text-transform:uppercase;
+  padding:0 18px;
+  border-radius:2px;
+}
+.send-btn:disabled{background:var(--amber-dim);cursor:not-allowed;}
+.send-btn:focus-visible, .chip:focus-visible, .confirm-btn:focus-visible, .mailto-btn:focus-visible, .copy-btn:focus-visible{
+  outline:2px solid var(--signal);outline-offset:2px;
+}
+
+/* ticket / spec sheet panel */
+.meter-wrap{padding:18px;border-bottom:1px solid var(--line);}
+.meter-label{
+  display:flex;justify-content:space-between;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--paper-dim);margin-bottom:8px;
+}
+.meter-label b{color:var(--paper);font-weight:600;}
+.meter{
+  display:flex;gap:3px;height:20px;
+}
+.bar{
+  flex:1;
+  background:var(--ink);
+  border:1px solid var(--line);
+  border-radius:1px;
+  transition:background 0.4s ease, border-color 0.4s ease;
+}
+.bar.lit-low{background:var(--amber-dim);border-color:var(--amber-dim);}
+.bar.lit-mid{background:var(--amber);border-color:var(--amber);}
+.bar.lit-high{background:var(--signal);border-color:var(--signal);}
+
+.spec{
+  padding:16px 18px;
+  display:flex;flex-direction:column;gap:11px;
+}
+.spec-row{
+  display:grid;
+  grid-template-columns:110px 1fr;
+  gap:10px;
+  font-size:13.5px;
+  align-items:baseline;
+}
+.spec-row .k{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--paper-dim);
+}
+.spec-row .v{
+  color:var(--paper);
+  transition:color 0.3s;
+}
+.spec-row .v.empty{color:var(--paper-dim);font-style:italic;}
+.spec-row .v.fresh{color:var(--signal);}
+.feature-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;}
+.feature-list li:before{content:"— ";color:var(--amber);}
+
+.quote-card{
+  margin:6px 18px 18px;
+  border:1px solid var(--signal-dim);
+  background:linear-gradient(180deg, rgba(111,207,151,0.08), transparent);
+  border-radius:3px;
+  padding:16px;
+  display:none;
+}
+.quote-card.show{display:block;animation:fadein 0.5s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.quote-card .qc-eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--signal);margin-bottom:6px;
+}
+.quote-card .qc-tier{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:19px;font-weight:600;margin-bottom:10px;
+}
+.qc-figures{display:flex;gap:22px;margin-bottom:14px;flex-wrap:wrap;}
+.qc-figures div{font-family:'IBM Plex Mono',monospace;}
+.qc-figures .num{font-size:20px;color:var(--paper);font-weight:600;}
+.qc-figures .lbl{font-size:10.5px;color:var(--paper-dim);text-transform:uppercase;letter-spacing:0.06em;}
+.qc-note{font-size:12.5px;color:var(--paper-dim);margin-bottom:14px;line-height:1.5;}
+
+.confirm-btn{
+  width:100%;
+  background:var(--signal);
+  color:var(--ink);
+  border:none;
+  font-weight:600;
+  font-size:13px;
+  letter-spacing:0.03em;
+  text-transform:uppercase;
+  padding:12px;
+  border-radius:2px;
+}
+.confirm-btn:hover{filter:brightness(1.08);}
+
+.confirmed-box{margin-top:14px;display:none;}
+.confirmed-box.show{display:block;animation:fadein 0.4s ease;}
+.confirmed-box .ok{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;color:var(--signal);margin-bottom:10px;
+}
+.contact-input{
+  width:100%;
+  background:var(--ink);
+  border:1px solid var(--line);
+  color:var(--paper);
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:13.5px;
+  padding:9px 10px;
+  border-radius:2px;
+  margin-bottom:8px;
+}
+.contact-input:focus{outline:2px solid var(--amber);outline-offset:1px;}
+.btn-row{display:flex;gap:8px;}
+.mailto-btn,.copy-btn{
+  flex:1;
+  background:transparent;
+  border:1px solid var(--amber);
+  color:var(--amber);
+  font-size:11.5px;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  padding:9px;
+  border-radius:2px;
+  text-align:center;
+  text-decoration:none;
+}
+.mailto-btn:hover,.copy-btn:hover{background:var(--amber);color:var(--ink);}
+
+.error-msg{
+  color:var(--red);
+  font-size:12.5px;
+  padding:0 18px 14px;
+  font-family:'IBM Plex Mono',monospace;
+}
+
+footer{
+  margin-top:26px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:var(--paper-dim);
+  text-align:center;
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Fingerprint Acoustic &middot; App Quote Desk</p>
+      <h1>Describe it. We'll spec it, price it, and get building.</h1>
+      <p class="sub">Tell the desk what you're trying to build — even a rough idea. It'll ask what it needs to know and hand you a real quote, not a form.</p>
+    </div>
+    <div class="ticket-id">JOB #<b id="jobId">—</b><br>STATUS: <b id="jobStatus">OPEN</b></div>
+  </header>
+
+  <div class="grid">
+    <!-- CHAT -->
+    <div class="panel">
+      <div class="panel-head"><span>Intake</span><span id="turnCount">0 exchanges</span></div>
+      <div class="chat-body" id="chatBody"></div>
+      <div class="suggestion-row" id="suggestionRow"></div>
+      <div id="errorSlot"></div>
+      <div class="input-row">
+        <textarea id="userInput" placeholder="e.g. I run a laundromat and want customers to book a pickup slot from their phone..." rows="1"></textarea>
+        <button class="send-btn" id="sendBtn">Send</button>
+      </div>
+    </div>
+
+    <!-- TICKET -->
+    <div class="panel">
+      <div class="panel-head"><span>Job Ticket</span><span>Live</span></div>
+      <div class="meter-wrap">
+        <div class="meter-label"><span>Picture clarity</span><b id="confidenceLabel">0%</b></div>
+        <div class="meter" id="meter"></div>
+      </div>
+      <div class="spec" id="specSheet"></div>
+      <div class="quote-card" id="quoteCard">
+        <p class="qc-eyebrow">Instant quote</p>
+        <div class="qc-tier" id="qcTier">—</div>
+        <div class="qc-figures">
+          <div><div class="num" id="qcPrice">—</div><div class="lbl">Estimate (USD)</div></div>
+          <div><div class="num" id="qcWeeks">—</div><div class="lbl">Timeline</div></div>
+        </div>
+        <p class="qc-note">Fixed-scope estimate based on what's been described. Final price is confirmed after a short scoping call if anything changes.</p>
+        <button class="confirm-btn" id="confirmBtn">Confirm — I want this built</button>
+        <div class="confirmed-box" id="confirmedBox">
+          <p class="ok">Locked in. Leave a way to reach you:</p>
+          <input class="contact-input" id="contactName" placeholder="Name">
+          <input class="contact-input" id="contactEmail" placeholder="Email">
+          <div class="btn-row">
+            <a class="mailto-btn" id="mailtoBtn" href="#">Email the studio</a>
+            <button class="copy-btn" id="copyBtn">Copy summary</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Fingerprint Acoustic — apps built for real use, priced before you commit.</footer>
+</div>
+
+<script>
+const CONFIG = {
+  ownerEmail: "info@fingerprintacoustic.com",
+  studioName: "Fingerprint Acoustic",
+  tiers: {
+    simple:   { label: "Simple utility",            price:[800,1500],   weeks:[1,2]  },
+    standard: { label: "Standard app",               price:[2000,4500],  weeks:[3,5]  },
+    complex:  { label: "Complex / multi-role app",   price:[5000,12000], weeks:[6,10] },
+    platform: { label: "Full platform / marketplace",price:[12000,25000],weeks:[10,16]}
+  }
+};
+
+const SYSTEM_PROMPT = `You are the intake desk for ${CONFIG.studioName}, a software studio that builds Android apps (Kotlin/Jetpack Compose), web apps, and full-stack products (Firebase/Firestore, Node.js/Express, static hosting). A prospective client is describing something they want built.
+
+Your job each turn:
+1. If their idea is vague, unclear, or they explicitly ask what they could build, propose 2-3 concrete, specific app concepts suited to their goal or industry, then ask which direction fits before narrowing further.
+2. Otherwise ask ONE focused clarifying question at a time to fill gaps in: platform (Android / iOS / web / cross-platform), core features, whether it needs a backend/database, user accounts, payments, multiple user roles (e.g. admin + customer), and any third-party integrations (maps, SMS, notifications, etc).
+3. Never ask more than 5-6 questions total across the whole conversation. Once you have a workable picture, stop asking and set "done": true with a short closing message summarizing what you understood.
+4. Keep messages short — 2-4 sentences, plain language, no jargon, conversational but efficient. No markdown formatting in "reply".
+
+Respond with ONLY raw JSON, no markdown fences, no commentary outside the JSON:
+{
+  "reply": "your message to the client",
+  "done": boolean,
+  "confidence": integer 0-100 (how clear the full picture is),
+  "specSheet": {
+    "platform": string or null,
+    "appType": string or null,
+    "coreFeatures": [array of short strings],
+    "needsBackend": boolean or null,
+    "needsAuth": boolean or null,
+    "needsPayments": boolean or null,
+    "multiRole": boolean or null,
+    "integrations": [array of short strings]
+  },
+  "complexityTier": "simple" | "standard" | "complex" | "platform" | null,
+  "suggestions": [array of 0-3 short reply chips the client might tap instead of typing, only when useful — e.g. quick answers to your question]
+}`;
+
+let history = [];
+let latestSpec = null;
+let latestTier = null;
+let isDone = false;
+let turns = 0;
+
+const chatBody = document.getElementById('chatBody');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const suggestionRow = document.getElementById('suggestionRow');
+const errorSlot = document.getElementById('errorSlot');
+const meter = document.getElementById('meter');
+const confidenceLabel = document.getElementById('confidenceLabel');
+const specSheet = document.getElementById('specSheet');
+const quoteCard = document.getElementById('quoteCard');
+const jobStatus = document.getElementById('jobStatus');
+const turnCount = document.getElementById('turnCount');
+
+document.getElementById('jobId').textContent = Math.floor(10000 + Math.random()*89999);
+
+// build meter bars
+const BAR_COUNT = 20;
+for (let i=0;i<BAR_COUNT;i++){
+  const b = document.createElement('div');
+  b.className = 'bar';
+  meter.appendChild(b);
+}
+
+function renderMeter(confidence){
+  const lit = Math.round((confidence/100) * BAR_COUNT);
+  const bars = meter.querySelectorAll('.bar');
+  bars.forEach((bar, i) => {
+    bar.className = 'bar';
+    if (i < lit){
+      if (confidence < 40) bar.classList.add('lit-low');
+      else if (confidence < 75) bar.classList.add('lit-mid');
+      else bar.classList.add('lit-high');
+    }
+  });
+  confidenceLabel.textContent = confidence + '%';
+}
+
+const SPEC_FIELDS = [
+  {key:'platform', label:'Platform'},
+  {key:'appType', label:'App type'},
+  {key:'coreFeatures', label:'Features', isList:true},
+  {key:'needsBackend', label:'Backend', isBool:true},
+  {key:'needsAuth', label:'Accounts', isBool:true},
+  {key:'needsPayments', label:'Payments', isBool:true},
+  {key:'multiRole', label:'User roles', isBool:true},
+  {key:'integrations', label:'Integrations', isList:true},
+];
+
+function renderSpec(spec){
+  specSheet.innerHTML = '';
+  SPEC_FIELDS.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'spec-row';
+    const k = document.createElement('div');
+    k.className = 'k';
+    k.textContent = f.label;
+    const v = document.createElement('div');
+    v.className = 'v';
+    const val = spec ? spec[f.key] : null;
+
+    if (f.isList){
+      if (val && val.length){
+        const ul = document.createElement('ul');
+        ul.className = 'feature-list';
+        val.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        });
+        v.appendChild(ul);
+      } else {
+        v.classList.add('empty');
+        v.textContent = 'not yet known';
+      }
+    } else if (f.isBool){
+      if (val === true) v.textContent = 'Yes';
+      else if (val === false) v.textContent = 'No';
+      else { v.classList.add('empty'); v.textContent = 'not yet known'; }
+    } else {
+      if (val){ v.textContent = val; }
+      else { v.classList.add('empty'); v.textContent = 'not yet known'; }
+    }
+    row.appendChild(k);
+    row.appendChild(v);
+    specSheet.appendChild(row);
+  });
+}
+
+renderSpec(null);
+renderMeter(0);
+
+function addMessage(role, text){
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.textContent = role === 'assistant' ? 'Studio' : 'You';
+  div.appendChild(tag);
+  div.appendChild(document.createTextNode(text));
+  chatBody.appendChild(div);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function showTyping(){
+  const div = document.createElement('div');
+  div.className = 'typing';
+  div.id = 'typingIndicator';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  chatBody.appendChild(div);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+function hideTyping(){
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+function setSuggestions(list){
+  suggestionRow.innerHTML = '';
+  if (!list || !list.length) return;
+  list.forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = s;
+    chip.onclick = () => { userInput.value = s; sendMessage(); };
+    suggestionRow.appendChild(chip);
+  });
+}
+
+function showError(msg){
+  errorSlot.innerHTML = '<p class="error-msg">' + msg + '</p>';
+}
+function clearError(){ errorSlot.innerHTML = ''; }
+
+function priceRange(tierKey){
+  const t = CONFIG.tiers[tierKey];
+  if (!t) return '—';
+  return '$' + t.price[0].toLocaleString() + '–' + t.price[1].toLocaleString();
+}
+function weeksRange(tierKey){
+  const t = CONFIG.tiers[tierKey];
+  if (!t) return '—';
+  return t.weeks[0] + '–' + t.weeks[1] + ' wks';
+}
+
+function renderQuote(tierKey, spec){
+  if (!tierKey || !CONFIG.tiers[tierKey]) return;
+  const t = CONFIG.tiers[tierKey];
+  document.getElementById('qcTier').textContent = t.label;
+  document.getElementById('qcPrice').textContent = priceRange(tierKey);
+  document.getElementById('qcWeeks').textContent = weeksRange(tierKey);
+  quoteCard.classList.add('show');
+  jobStatus.textContent = 'QUOTED';
+}
+
+async function callClaude(){
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: SYSTEM_PROMPT,
+      messages: history
+    })
+  });
+  if (!res.ok) throw new Error('Request failed (' + res.status + ')');
+  const data = await res.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No response received');
+  let raw = textBlock.text.trim();
+  raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/,'').replace(/```\s*$/,'');
+  return JSON.parse(raw);
+}
+
+async function sendMessage(){
+  const text = userInput.value.trim();
+  if (!text || isDone) return;
+  clearError();
+  setSuggestions([]);
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+  userInput.value = '';
+  autoGrow();
+  sendBtn.disabled = true;
+  userInput.disabled = true;
+  showTyping();
+
+  try{
+    const parsed = await callClaude();
+    hideTyping();
+    turns++;
+    turnCount.textContent = turns + (turns === 1 ? ' exchange' : ' exchanges');
+
+    addMessage('assistant', parsed.reply || "Got it.");
+    history.push({ role: 'assistant', content: JSON.stringify(parsed) });
+
+    if (typeof parsed.confidence === 'number') renderMeter(parsed.confidence);
+    if (parsed.specSheet){ latestSpec = parsed.specSheet; renderSpec(parsed.specSheet); }
+    if (parsed.complexityTier){ latestTier = parsed.complexityTier; }
+    if (parsed.suggestions) setSuggestions(parsed.suggestions);
+
+    if (parsed.done){
+      isDone = true;
+      userInput.placeholder = "Conversation complete — see your quote →";
+      if (latestTier) renderQuote(latestTier, latestSpec);
+    }
+  } catch(err){
+    hideTyping();
+    showError("Couldn't reach the studio desk — " + err.message + ". Try sending again.");
+  } finally {
+    sendBtn.disabled = false;
+    userInput.disabled = isDone;
+    if (!isDone) userInput.focus();
+  }
+}
+
+function autoGrow(){
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+}
+
+userInput.addEventListener('input', autoGrow);
+userInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+document.getElementById('confirmBtn').addEventListener('click', () => {
+  document.getElementById('confirmedBox').classList.add('show');
+  jobStatus.textContent = 'CONFIRMED';
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const summary = buildSummary();
+  navigator.clipboard.writeText(summary).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => btn.textContent = original, 1500);
+  });
+});
+
+function buildSummary(){
+  const name = document.getElementById('contactName').value || '(no name given)';
+  const email = document.getElementById('contactEmail').value || '(no email given)';
+  const tier = latestTier ? CONFIG.tiers[latestTier].label : 'Unspecified';
+  const spec = latestSpec || {};
+  const lines = [
+    'New quote confirmation — ' + CONFIG.studioName,
+    '',
+    'From: ' + name + ' (' + email + ')',
+    'Tier: ' + tier,
+    'Estimate: ' + priceRange(latestTier) + ' / ' + weeksRange(latestTier),
+    'Platform: ' + (spec.platform || 'n/a'),
+    'App type: ' + (spec.appType || 'n/a'),
+    'Core features: ' + ((spec.coreFeatures || []).join(', ') || 'n/a'),
+    'Backend: ' + (spec.needsBackend ? 'Yes' : 'No'),
+    'Accounts: ' + (spec.needsAuth ? 'Yes' : 'No'),
+    'Payments: ' + (spec.needsPayments ? 'Yes' : 'No'),
+    'Multiple user roles: ' + (spec.multiRole ? 'Yes' : 'No'),
+    'Integrations: ' + ((spec.integrations || []).join(', ') || 'n/a'),
+  ];
+  return lines.join('\n');
+}
+
+function refreshMailto(){
+  const summary = buildSummary();
+  const subject = encodeURIComponent('App quote confirmed — Job #' + document.getElementById('jobId').textContent);
+  const body = encodeURIComponent(summary);
+  document.getElementById('mailtoBtn').href =
+    'mailto:' + CONFIG.ownerEmail + '?subject=' + subject + '&body=' + body;
+}
+['contactName','contactEmail'].forEach(id => {
+  document.getElementById(id).addEventListener('input', refreshMailto);
+});
+document.getElementById('confirmBtn').addEventListener('click', refreshMailto);
+
+// opening message
+(function init(){
+  const opener = "Tell me what you're trying to build — a one-liner is fine. If you're not sure yet what kind of app fits, just say that and I'll suggest a few directions.";
+  addMessage('assistant', opener);
+  history.push({ role: 'user', content: '[SYSTEM: conversation starting, no client message yet — send your opening line as the "reply" field of the JSON schema, done=false, confidence=0, specSheet all null/empty]' });
+  history.push({ role: 'assistant', content: JSON.stringify({reply: opener, done:false, confidence:0, specSheet:{platform:null,appType:null,coreFeatures:[],needsBackend:null,needsAuth:null,needsPayments:null,multiRole:null,integrations:[]}, complexityTier:null, suggestions:["I know exactly what I want","Not sure — suggest some ideas"]}) });
+  setSuggestions(["I know exactly what I want","Not sure — suggest some ideas"]);
+  userInput.focus();
+})();
+</script>
+</body>
+</html>
