@@ -327,6 +327,18 @@ button{
   margin-bottom:8px;
 }
 .contact-input:focus{outline:2px solid var(--amber);outline-offset:1px;}
+.contact-pref-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.pref-chip{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--paper-dim);
+  padding:6px 10px;
+  border-radius:2px;
+  cursor:pointer;
+}
+.pref-chip.active{border-color:var(--signal);color:var(--signal);}
 .btn-row{display:flex;gap:8px;}
 .mailto-btn,.copy-btn{
   flex:1;
@@ -393,22 +405,31 @@ footer{
       </div>
       <div class="spec" id="specSheet"></div>
       <div class="quote-card" id="quoteCard">
-        <p class="qc-eyebrow">Instant quote</p>
-        <div class="qc-tier" id="qcTier">—</div>
-        <div class="qc-figures">
-          <div><div class="num" id="qcPrice">—</div><div class="lbl">Estimate (USD)</div></div>
-          <div><div class="num" id="qcWeeks">—</div><div class="lbl">Timeline</div></div>
-        </div>
-        <p class="qc-note">Fixed-scope estimate based on what's been described. Final price is confirmed after a short scoping call if anything changes.</p>
-        <button class="confirm-btn" id="confirmBtn">Confirm — I want this built</button>
-        <div class="confirmed-box" id="confirmedBox">
-          <p class="ok">Locked in. Leave a way to reach you:</p>
+        <p class="qc-eyebrow">Your picture's clear — one step left</p>
+
+        <div id="quoteGate">
+          <p class="qc-note" style="margin-bottom:12px;">Leave a way to reach you and your instant quote unlocks right below.</p>
           <input class="contact-input" id="contactName" placeholder="Name">
           <input class="contact-input" id="contactEmail" placeholder="Email">
+          <input class="contact-input" id="contactPhone" placeholder="Phone (optional)">
+          <input class="contact-input" id="contactHoneypot" name="company_website" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
+          <div class="contact-pref-row" id="contactPrefRow"></div>
+          <button class="confirm-btn" id="unlockBtn">Get my instant quote</button>
+          <p class="error-msg" id="gateError" style="padding:8px 0 0;display:none;">Please add your name and a valid email.</p>
+        </div>
+
+        <div id="quoteReveal" style="display:none;">
+          <div class="qc-tier" id="qcTier">—</div>
+          <div class="qc-figures">
+            <div><div class="num" id="qcPrice">—</div><div class="lbl">Estimate (USD)</div></div>
+            <div><div class="num" id="qcWeeks">—</div><div class="lbl">Timeline</div></div>
+          </div>
+          <p class="qc-note">Fixed-scope estimate based on what's been described. Final price is confirmed after a short scoping call if anything changes.</p>
           <div class="btn-row">
-            <a class="mailto-btn" id="mailtoBtn" href="#">Email the studio</a>
+            <a class="mailto-btn" id="mailtoBtn" href="#">Open email app</a>
             <button class="copy-btn" id="copyBtn">Copy summary</button>
           </div>
+          <p class="qc-note" style="margin-top:10px;margin-bottom:0;">If "Open email app" doesn't do anything (common if you don't have a default mail app set up), tap Copy summary and send it to <b id="ownerEmailInline">info@fingerprintacoustic.com</b> yourself — or just leave your phone number above and mention you'd rather be called.</p>
         </div>
       </div>
     </div>
@@ -420,6 +441,10 @@ footer{
 <script>
 const CONFIG = {
   ownerEmail: "info@fingerprintacoustic.com",
+  // Push notifications via ntfy.sh — free, no account needed.
+  // Install the ntfy app (iOS/Android) and subscribe to this exact topic name.
+  // Keep this topic name private-ish; anyone who knows it could send you fake alerts.
+  ntfyTopic: "fpa-quotes-il85znftog",
   studioName: "Fingerprint Acoustic",
   tiers: {
     simple:   { label: "Simple utility",             price:[800,1500],    weeks:[1,2]  },
@@ -446,6 +471,14 @@ const GOAL_SUGGESTIONS = {
   "Community & events": [
     "Events app — list upcoming events, RSVP, sell tickets.",
     "Community hub app — members post updates, join groups, message each other."
+  ],
+  "Homecare": [
+    "Caregiver scheduling app — match caregivers to clients, log visit check-ins and care notes.",
+    "Family care portal — family members view care logs, message caregivers, manage billing."
+  ],
+  "Transportation": [
+    "Ride app — request a ride, match with a driver, track live location and fare.",
+    "Freight & courier app — request a pickup, track shipment status, manage driver assignments."
   ],
   "Something else": [
     "Tell me a bit about the problem you're trying to solve below and we'll shape it together as we go."
@@ -578,13 +611,19 @@ function weeksRange(tierKey){
   if (!t) return '—';
   return t.weeks[0] + '–' + t.weeks[1] + ' wks';
 }
-function renderQuote(tierKey){
+function showQuoteGate(){
+  quoteCard.classList.add('show');
+  renderContactPrefChips();
+  jobStatus.textContent = 'AWAITING CONTACT';
+}
+function fillQuoteDetails(tierKey){
   if (!tierKey || !CONFIG.tiers[tierKey]) return;
   const t = CONFIG.tiers[tierKey];
   document.getElementById('qcTier').textContent = t.label;
   document.getElementById('qcPrice').textContent = priceRange(tierKey);
   document.getElementById('qcWeeks').textContent = weeksRange(tierKey);
-  quoteCard.classList.add('show');
+  document.getElementById('quoteGate').style.display = 'none';
+  document.getElementById('quoteReveal').style.display = 'block';
   jobStatus.textContent = 'QUOTED';
 }
 
@@ -825,19 +864,73 @@ function step_features(){
 function step_done(){
   latestTier = computeTier();
   const tierLabel = CONFIG.tiers[latestTier].label;
-  addMessage('assistant', "Got it — that reads as a " + tierLabel.toLowerCase() + ". Here's the estimate on the right. Confirm it when you're ready and I'll get in touch.");
+  addMessage('assistant', "Got it — I've got a " + tierLabel.toLowerCase() + " picture here. Leave your details on the right and your instant quote unlocks right away.");
   disableTextInput();
   suggestionRow.innerHTML = '';
   userInput.placeholder = "Conversation complete — see your quote →";
   renderMeter(100);
-  renderQuote(latestTier);
+  showQuoteGate();
 }
 
-document.getElementById('confirmBtn').addEventListener('click', () => {
-  document.getElementById('confirmedBox').classList.add('show');
-  jobStatus.textContent = 'CONFIRMED';
+let preferredContact = 'Either';
+function renderContactPrefChips(){
+  const row = document.getElementById('contactPrefRow');
+  row.innerHTML = '';
+  ['Email', 'Phone call', 'Either'].forEach(opt => {
+    const chip = document.createElement('button');
+    chip.className = 'pref-chip' + (opt === preferredContact ? ' active' : '');
+    chip.textContent = opt;
+    chip.onclick = () => {
+      preferredContact = opt;
+      renderContactPrefChips();
+      refreshMailto();
+    };
+    row.appendChild(chip);
+  });
+}
+
+function sendPushNotification(){
+  if (!CONFIG.ntfyTopic) return; // not configured — skip silently
+  const name = document.getElementById('contactName').value || 'Someone';
+  const tier = latestTier ? CONFIG.tiers[latestTier].label : 'Unspecified';
+  const price = priceRange(latestTier);
+  const url = 'https://ntfy.sh/' + CONFIG.ntfyTopic;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Title': 'New quote confirmed',
+      'Tags': 'moneybag'
+    },
+    body: name + ' — ' + tier + ' — ' + price
+  }).catch(() => { /* notification is best-effort — never block the confirm flow on it */ });
+}
+
+function isValidEmail(email){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+document.getElementById('unlockBtn').addEventListener('click', () => {
+  const name = document.getElementById('contactName').value.trim();
+  const email = document.getElementById('contactEmail').value.trim();
+  const honeypot = document.getElementById('contactHoneypot').value.trim();
+  const gateError = document.getElementById('gateError');
+
+  if (honeypot){
+    // Likely a bot — pretend nothing happened, don't reveal or notify.
+    return;
+  }
+  if (!name || !isValidEmail(email)){
+    gateError.style.display = 'block';
+    return;
+  }
+  gateError.style.display = 'none';
+
+  fillQuoteDetails(latestTier);
   refreshMailto();
+  sendPushNotification();
 });
+
+document.getElementById('mailtoBtn').addEventListener('click', sendPushNotification);
 
 document.getElementById('copyBtn').addEventListener('click', () => {
   const summary = buildSummary();
@@ -847,16 +940,21 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     btn.textContent = 'Copied';
     setTimeout(() => btn.textContent = original, 1500);
   });
+  sendPushNotification();
 });
 
 function buildSummary(){
   const name = document.getElementById('contactName').value || '(no name given)';
   const email = document.getElementById('contactEmail').value || '(no email given)';
+  const phone = document.getElementById('contactPhone').value || '(no phone given)';
   const tier = latestTier ? CONFIG.tiers[latestTier].label : 'Unspecified';
   const lines = [
     'New quote confirmation — ' + CONFIG.studioName,
     '',
-    'From: ' + name + ' (' + email + ')',
+    'From: ' + name,
+    'Email: ' + email,
+    'Phone: ' + phone,
+    'Prefers to be contacted by: ' + preferredContact,
     'Tier: ' + tier,
     'Estimate: ' + priceRange(latestTier) + ' / ' + weeksRange(latestTier),
     'Platform: ' + (spec.platform || 'n/a'),
@@ -878,7 +976,7 @@ function refreshMailto(){
   document.getElementById('mailtoBtn').href =
     'mailto:' + CONFIG.ownerEmail + '?subject=' + subject + '&body=' + body;
 }
-['contactName','contactEmail'].forEach(id => {
+['contactName','contactEmail','contactPhone'].forEach(id => {
   document.getElementById(id).addEventListener('input', refreshMailto);
 });
 
